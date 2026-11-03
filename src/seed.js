@@ -8,7 +8,15 @@ const bcrypt = require('bcryptjs');
 const { todayISO, addDays, addMonths, loadCerts, daysBetween } = require('./domain');
 const { deliver, runReminders, THRESHOLDS } = require('./reminders');
 
-if (db.prepare('SELECT COUNT(*) c FROM users').get().c) { console.log('Database already seeded. Use --reset to start over.'); process.exit(0); }
+console.log(`[seed] DEMO_ADMIN_PASSWORD present: ${process.env.DEMO_ADMIN_PASSWORD ? 'yes' : 'no'}; DEMO_STAFF_PASSWORD present: ${process.env.DEMO_STAFF_PASSWORD ? 'yes' : 'no'}`);
+if (db.prepare('SELECT COUNT(*) c FROM users').get().c) {
+  // Existing DB: on every boot, re-apply the demo admin password from env so a changed value always takes effect.
+  if (process.env.DEMO_ADMIN_PASSWORD) {
+    const n = db.prepare("UPDATE users SET password_hash=? WHERE role='admin'").run(bcrypt.hashSync(process.env.DEMO_ADMIN_PASSWORD, 12)).changes;
+    console.log(`[seed] Database already seeded; reset password for ${n} admin account(s) from DEMO_ADMIN_PASSWORD.`);
+  } else console.log('Database already seeded. Use --reset to start over.');
+  process.exit(0);
+}
 const T = todayISO();
 const D = '@harborpine.example';
 
@@ -141,6 +149,10 @@ for (const c of loadCerts()) {
   if (c.days < 0) for (let d = addDays(c.expiry_date, 1); daysBetween(d, T) >= 7; d = addDays(d, 7)) deliver({ ...c, days: daysBetween(T, c.expiry_date) + daysBetween(d, T) }, 'overdue', 'scheduler', d + ' 13:00:00');
 }
 const sent = runReminders('scheduler');
+if (process.env.DEMO_ADMIN_PASSWORD) {
+  const h = db.prepare("SELECT password_hash FROM users WHERE role='admin' ORDER BY id LIMIT 1").get();
+  console.log(`[seed] admin password matches DEMO_ADMIN_PASSWORD: ${h && bcrypt.compareSync(process.env.DEMO_ADMIN_PASSWORD, h.password_hash) ? 'yes' : 'NO'}`);
+}
 
 const file = path.join(process.env.STORAGE_DIR || path.join(__dirname, '..'), 'DEMO_CREDENTIALS.md');
 const lines = ['# Credentia — demo accounts', '', 'Demo environment only. Passwords were randomly generated at seed time; each user can change theirs under **Account**.', '',
