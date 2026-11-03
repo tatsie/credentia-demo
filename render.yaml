@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: credentia-demo
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/seed.js && node src/index.js
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: HOST
+        value: 0.0.0.0
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DEMO_ADMIN_PASSWORD
+        sync: false
+      - key: DEMO_STAFF_PASSWORD
+        sync: false
+      - key: PUBLIC_URL
+        sync: false

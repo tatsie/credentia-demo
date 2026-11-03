@@ -1,0 +1,13 @@
+'use strict';
+const X = require('./server');
+require('./routes/dashboard')(X);
+require('./routes/licences')(X);
+require('./routes/ce')(X);
+require('./routes/admin')(X);
+const { app, V, runReminders } = X;
+app.use((req, res) => res.status(404).send(String(V.errorPage(404, 'We couldn’t find that page or you don’t have access to it.'))));
+app.use((err, req, res, next) => { console.error(err); res.status(500).send(String(V.errorPage(500, 'Something went wrong. Please try again.'))); });
+const PORT = Number(process.env.PORT || 3000);
+app.listen(PORT, process.env.HOST || '127.0.0.1', () => console.log(`Credentia listening on http://127.0.0.1:${PORT}`));
+const tick = () => { try { const c = runReminders('scheduler'); if (c) console.log(`[reminders] sent ${c}`); } catch (e) { console.error('[reminders]', e); } };
+setTimeout(tick, 2000); setInterval(tick, 3600e3);
