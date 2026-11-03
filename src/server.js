@@ -89,6 +89,13 @@ const loginLimiter = rateLimit({
   windowMs: 15 * 60e3, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, skipSuccessfulRequests: true,
   handler: (req, res) => res.status(429).send(String(loginPage(res, 'Too many sign-in attempts from your network. Please wait 15 minutes and try again.'))),
 });
+// Demo mode: one-click sign-in as sample accounts. OFF unless DEMO_MODE=1|true is set explicitly.
+const DEMO_MODE = /^(1|true|yes|on)$/i.test(process.env.DEMO_MODE || '');
+const DEMO_ACCOUNTS = [
+  { key: 'admin', email: 'morgan.ellis@harborpine.example', role: 'admin', name: 'Morgan Ellis', title: 'Director of Operations', initials: 'ME' },
+  { key: 'staff', email: 'daniel.okafor@harborpine.example', role: 'staff', name: 'Daniel Okafor', title: 'Senior Tax Manager', initials: 'DO' },
+];
+if (DEMO_MODE) console.log('DEMO_MODE is ON: one-click demo sign-in is enabled on /login. Never enable this for real client data.');
 const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', 12);
 
 function loginPage(res, error, email = '') {
@@ -99,7 +106,7 @@ function loginPage(res, error, email = '') {
 <div class="art-copy"><h2>Every licence current.<br><span>Every hour accounted for.</span></h2><p>Track CPA, EA, CFP, CMA and CISA requirements across your firm — with certificates on file and renewal reminders that send themselves.</p></div>
 <div class="art-card"><div class="ac-row"><span class="badge b-current"><span class="dot"></span>Current</span><span class="ac-meta">CPA · California</span></div><div class="ac-h"><strong>74</strong><span>/ 80 hrs</span></div><progress class="pg pg-current" value="74" max="80"></progress><div class="ac-foot"><span>Ethics 4 / 4 ✓</span><span>Renews in 7 mo</span></div></div>
 </div></section>
-<section class="login-form"><form method="post" action="/login" class="lf" autocomplete="on">
+<section class="login-form"><div class="lf"><form method="post" action="/login" class="lf-in" autocomplete="on">
 <div class="brand only-m">${V.logo()}<div><strong>Credentia</strong></div></div>
 <h1>Sign in</h1><p class="muted">Welcome back. Use your firm account to continue.</p>
 ${error ? html`<div class="flash f-error">${icon('alert')}<span>${error}</span></div>` : ''}
@@ -108,7 +115,11 @@ ${error ? html`<div class="flash f-error">${icon('alert')}<span>${error}</span><
 <label class="fld"><span>Password</span><input type="password" name="password" required autocomplete="current-password" maxlength="200"></label>
 <button class="btn primary wide" type="submit">Sign in ${icon('arrow')}</button>
 <p class="fine">${icon('lock')} Encrypted session · Access is logged and role-restricted</p>
-</form></section></div><script src="/app.js"></script></body></html>`;
+</form>
+${DEMO_MODE ? html`<div class="demo-box"><div class="demo-sep"><span>Explore the demo</span></div>
+<div class="demo-btns">${DEMO_ACCOUNTS.map(a => html`<form method="post" action="/demo-login"><input type="hidden" name="_csrf" value="${res.locals.csrf}"><input type="hidden" name="who" value="${a.key}">
+<button class="demo-btn" type="submit"><span class="demo-av">${a.initials}</span><span class="demo-tx"><strong>View as ${a.role}</strong><small>${a.name} · ${a.title}</small></span>${icon('arrow')}</button></form>`)}</div>
+<p class="fine">Demo mode · sample data for Harbor &amp; Pine, resets on restart</p></div>` : ''}</div></section></div><script src="/app.js"></script></body></html>`;
 }
 
 app.get('/login', (req, res) => { if (req.user) return res.redirect('/'); res.send(String(loginPage(res))); });
@@ -132,6 +143,22 @@ app.post('/login', loginLimiter, async (req, res) => {
     audit(u.id, 'login.success', null, req.ip);
     req.session.save(() => res.redirect('/'));
   });
+});
+function startSession(req, res, u, action) {
+  req.session.regenerate(err => {
+    if (err) return res.status(500).end();
+    req.session.uid = u.id; req.session.csrf = crypto.randomBytes(32).toString('hex');
+    db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
+    audit(u.id, action, null, req.ip);
+    req.session.save(() => res.redirect('/'));
+  });
+}
+app.post('/demo-login', (req, res) => {
+  if (!DEMO_MODE) return res.status(404).send(String(V.errorPage(404, 'Page not found.')));
+  const a = DEMO_ACCOUNTS.find(x => x.key === req.body.who);
+  const u = a && db.prepare('SELECT * FROM users WHERE email=? AND role=? AND active=1').get(a.email, a.role);
+  if (!u) return res.status(400).send(String(loginPage(res, 'That demo account is not available.')));
+  startSession(req, res, u, 'login.demo');
 });
 app.post('/logout', (req, res) => { const uid = req.user && req.user.id; req.session.destroy(() => { if (uid) audit(uid, 'logout'); res.clearCookie('credentia.sid'); res.redirect('/login'); }); });
 
