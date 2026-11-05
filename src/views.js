@@ -1,6 +1,6 @@
 'use strict';
 const { html, raw } = require('./html');
-const { STATUS_LABEL } = require('./domain');
+const { STATUS_LABEL, COLOR_LABEL, COLOR_HINT } = require('./domain');
 
 const P = {
   dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -29,6 +29,8 @@ const P = {
   csv: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M8 13h8M8 17h8"/>',
   trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  shield: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
 };
 const icon = (n, cls = 'i') => raw(`<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ''}</svg>`);
 const logo = () => raw(`<svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b8bff"/><stop offset="1" stop-color="#5046e5"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#lg)"/><path d="M21.5 11.2a7 7 0 1 0 0 9.6" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><path d="m13.2 16 2.3 2.3 4.4-4.6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`);
@@ -48,6 +50,10 @@ function relDays(d) {
 }
 const n = x => (Math.round(x * 10) / 10).toString();
 const badge = s => html`<span class="badge b-${s}"><span class="dot"></span>${STATUS_LABEL[s]}</span>`;
+const colorBadge = c => {
+  const color = typeof c === 'string' ? c : c.color;
+  return html`<span class="badge b-${color}" title="${COLOR_HINT[color] || ''}"><span class="dot"></span>${COLOR_LABEL[color] || color}</span>`;
+};
 const initials = name => name.split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
 const avatar = (name, cls = '') => html`<span class="avatar ${cls}" data-hue="${[...name].reduce((a, c) => a + c.charCodeAt(0), 0) % 6}">${initials(name)}</span>`;
 const progress = (value, max, status) => html`<progress class="pg pg-${status}" value="${Math.min(value, max || 1)}" max="${max || 1}"></progress>`;
@@ -77,7 +83,7 @@ function barsChart(items) { // [{label, value, hi}]
 
 function nav(user, active) {
   const items = user.role === 'admin'
-    ? [['dashboard', '/', 'Overview'], ['licence', '/licences', 'Licences'], ['ce', '/ce', 'CE credits'], ['people', '/people', 'People'], ['catalog', '/catalog', 'Credential catalog'], ['bell', '/reminders', 'Reminders'], ['mail', '/outbox', 'Outbox']]
+    ? [['dashboard', '/', 'Overview'], ['licence', '/licences', 'Licences'], ['ce', '/ce', 'CE credits'], ['people', '/people', 'People'], ['catalog', '/catalog', 'Credential catalog'], ['bell', '/reminders', 'Reminders'], ['mail', '/outbox', 'Outbox'], ['folder', '/settings', 'Settings']]
     : [['dashboard', '/', 'My compliance'], ['licence', '/licences', 'My licences'], ['ce', '/ce', 'My CE credits']];
   return items.map(([ic, href, label]) => html`<a href="${href}" class="nav-a${active === href ? ' on' : ''}">${icon(ic)}<span>${label}</span></a>`);
 }
@@ -105,4 +111,4 @@ function errorPage(code, msg) {
   return html`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${code} · Credentia</title><script src="/theme.js"></script><link rel="stylesheet" href="/app.css"></head><body class="center-page"><div class="err-card">${logo()}<h1>${code}</h1><p>${msg}</p><a class="btn" href="/">Back to Credentia</a></div></body></html>`;
 }
 
-module.exports = { layout, icon, logo, badge, avatar, progress, donut, barsChart, fmtDate, fmtDateTime, relDays, n, errorPage };
+module.exports = { layout, icon, logo, badge, colorBadge, avatar, progress, donut, barsChart, fmtDate, fmtDateTime, relDays, n, errorPage, COLOR_LABEL, COLOR_HINT };

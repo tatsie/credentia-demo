@@ -1,31 +1,35 @@
 'use strict';
 module.exports = (X) => {
-  const { app, db, loadCerts, todayISO, isISODate, addDays, THRESHOLDS, KIND_LABEL, sendManual, transportName, audit, html, raw, icon, badge, avatar, progress, fmtDate, fmtDateTime, relDays, n, isAdmin, canAccessUser, requireAdmin, flash, render, csrfField, notFound, certLabel, hoursCell, emptyState, statusCounts, ceTable } = X;
+  const { app, db, loadCerts, todayISO, isISODate, addDays, THRESHOLDS, KIND_LABEL, sendManual, transportName, audit, html, raw, icon, badge, colorBadge, avatar, progress, fmtDate, fmtDateTime, relDays, n, isAdmin, canAccessUser, requireAdmin, flash, render, csrfField, notFound, certLabel, hoursCell, emptyState, statusCounts, colorCounts, ceTable, COLOR_LABEL } = X;
 
   app.get('/licences', (req, res) => {
     const admin = isAdmin(req);
     let certs = admin ? loadCerts().filter(c => c.active) : loadCerts({ userId: req.user.id });
     const q = String(req.query.q || '').trim().toLowerCase().slice(0, 100);
     const status = ['current', 'due', 'expired'].includes(req.query.status) ? req.query.status : '';
+    const color = ['green', 'yellow', 'red'].includes(req.query.color) ? req.query.color : '';
     const type = String(req.query.type || '').slice(0, 20);
     const all = certs;
     if (q) certs = certs.filter(c => [c.person, c.type_name, c.code, c.jurisdiction, c.licence_number].join(' ').toLowerCase().includes(q));
     if (status) certs = certs.filter(c => c.status === status);
+    if (color) certs = certs.filter(c => c.color === color);
     if (type) certs = certs.filter(c => c.code === type);
     const types = db.prepare('SELECT code,name FROM cert_types ORDER BY name').all();
     const s = statusCounts(all);
-    const qs = st => { const p = new URLSearchParams(); if (st) p.set('status', st); if (type) p.set('type', type); if (q) p.set('q', q); const x = p.toString(); return x ? '?' + x : '/licences'; };
-    const tab = (st, label, count) => html`<a class="seg-a${status === st ? ' on' : ''}" href="${qs(st)}">${label}<span>${count}</span></a>`;
+    const cc = colorCounts(all);
+    const qs = (st, col) => { const p = new URLSearchParams(); if (st) p.set('status', st); if (col) p.set('color', col); if (type) p.set('type', type); if (q) p.set('q', q); const x = p.toString(); return x ? '?' + x : '/licences'; };
+    const tab = (st, label, count) => html`<a class="seg-a${status === st && !color ? ' on' : ''}" href="${qs(st, '')}">${label}<span>${count}</span></a>`;
+    const ctab = (col, label, count) => html`<a class="seg-a${color === col ? ' on' : ''}" href="${qs('', col)}">${label}<span>${count}</span></a>`;
     const body = html`
-<div class="toolbar"><nav class="seg">${tab('', 'All', all.length)}${tab('current', 'Current', s.current)}${tab('due', 'Due soon', s.due)}${tab('expired', 'Expired', s.expired)}</nav>
-<form class="filters" method="get">${status ? html`<input type="hidden" name="status" value="${status}">` : ''}
+<div class="toolbar"><nav class="seg">${tab('', 'All', all.length)}${ctab('green', 'Green', cc.green)}${ctab('yellow', 'Yellow', cc.yellow)}${ctab('red', 'Red', cc.red)}<span class="seg-gap"></span>${tab('current', 'Current', s.current)}${tab('due', 'Due soon', s.due)}${tab('expired', 'Expired', s.expired)}</nav>
+<form class="filters" method="get">${status ? html`<input type="hidden" name="status" value="${status}">` : ''}${color ? html`<input type="hidden" name="color" value="${color}">` : ''}
 <label class="search">${icon('search')}<input name="q" value="${q}" placeholder="${admin ? 'Search people, credentials, states…' : 'Search…'}"></label>
 <select name="type" class="sel auto-submit"><option value="">All credentials</option>${types.map(t => html`<option value="${t.code}"${t.code === type ? raw(' selected') : ''}>${t.name}</option>`)}</select></form></div>
-<div class="card flush">${certs.length ? html`<div class="tbl-wrap"><table class="tbl"><thead><tr>${admin ? raw('<th>Person</th>') : ''}<th>Credential</th><th>Licence #</th><th>Cycle start</th><th>Renews</th><th class="w-hours">CE hours</th><th>Status</th></tr></thead><tbody>
-${certs.map(c => html`<tr class="rowlink" data-href="/licences/${c.id}">${admin ? html`<td><div class="who">${avatar(c.person, 'sm')}<span>${c.person}</span></div></td>` : ''}<td><a href="/licences/${c.id}"><span class="code">${c.code}</span> ${c.type_name}</a><span class="sub">${c.jurisdiction || c.issuer || ''}</span></td><td class="mono">${c.licence_number || '—'}</td><td class="nowrap muted">${fmtDate(c.cycle_start)}</td><td><span class="nowrap">${fmtDate(c.expiry_date)}</span><span class="sub ${c.days < 0 ? 't-bad' : c.days <= 90 ? 't-warn' : ''}">${relDays(c.days)}</span></td><td>${hoursCell(c)}</td><td>${badge(c.status)}</td></tr>`)}
+<div class="card flush">${certs.length ? html`<div class="tbl-wrap"><table class="tbl"><thead><tr>${admin ? raw('<th>Person</th>') : ''}<th>Credential</th><th>Licence #</th><th>Cycle start</th><th>Renews</th><th class="w-hours">CE hours</th><th>Colour</th><th>Timing</th></tr></thead><tbody>
+${certs.map(c => html`<tr class="rowlink" data-href="/licences/${c.id}">${admin ? html`<td><div class="who">${avatar(c.person, 'sm')}<span>${c.person}</span></div></td>` : ''}<td><a href="/licences/${c.id}"><span class="code">${c.code}</span> ${c.type_name}</a><span class="sub">${c.jurisdiction || c.issuer || ''}</span></td><td class="mono">${c.licence_number || '—'}</td><td class="nowrap muted">${fmtDate(c.cycle_start)}</td><td><span class="nowrap">${fmtDate(c.expiry_date)}</span><span class="sub ${c.days < 0 ? 't-bad' : c.days <= 90 ? 't-warn' : ''}">${relDays(c.days)}</span></td><td>${hoursCell(c)}</td><td>${colorBadge(c)}</td><td>${badge(c.status)}</td></tr>`)}
 </tbody></table></div>` : emptyState('No matching licences', 'Try a different filter or add a licence.')}</div>`;
-    render(req, res, { title: admin ? 'Licences & certifications' : 'My licences', subtitle: `${all.length} tracked`, active: '/licences', body,
-      actions: html`${admin ? html`<a class="btn ghost" href="/reports/compliance.csv">${icon('csv')}<span class="hide-s">Export</span></a>` : ''}<a class="btn primary" href="/licences/new">${icon('plus')}<span class="hide-s">Add licence</span></a>` });
+    render(req, res, { title: admin ? 'Licences & certifications' : 'My licences', subtitle: `${all.length} tracked · ${cc.green} green · ${cc.yellow} yellow · ${cc.red} red`, active: '/licences', body,
+      actions: html`${admin ? html`<a class="btn ghost" href="/reports/cpe-folder.zip">${icon('folder')}<span class="hide-s">CPE folder</span></a><a class="btn ghost" href="/reports/compliance.csv">${icon('csv')}<span class="hide-s">CSV</span></a>` : ''}<a class="btn primary" href="/licences/new">${icon('plus')}<span class="hide-s">Add licence</span></a>` });
   });
 
   function licenceForm(req, res, c, errors) {
@@ -42,17 +46,25 @@ ${isAdmin(req) ? html`<label class="fld"><span>Person</span><select name="user_i
 <label class="fld"><span>Renewal / expiry date</span><input type="date" name="expiry_date" id="cexp" value="${v.expiry_date || ''}" required></label></div>
 <div class="row2"><label class="fld"><span>CE hours required this cycle</span><input type="number" step="0.5" min="0" max="500" name="hours_required" id="chours" value="${v.hours_required ?? ''}" required></label>
 <label class="fld"><span>…of which ethics hours</span><input type="number" step="0.5" min="0" max="100" name="ethics_required" id="cethics" value="${v.ethics_required ?? 0}" required></label></div>
+<label class="fld"><span>Compliance colour</span><select name="compliance_color">
+<option value="auto"${(v.compliance_color || 'auto') === 'auto' ? raw(' selected') : ''}>Auto — from hours &amp; renewal date</option>
+<option value="green"${v.compliance_color === 'green' ? raw(' selected') : ''}>Green — Compliant</option>
+<option value="yellow"${v.compliance_color === 'yellow' ? raw(' selected') : ''}>Yellow — Licence held; renewal info needed</option>
+<option value="red"${v.compliance_color === 'red' ? raw(' selected') : ''}>Red — Not compliant; being worked toward</option>
+</select><em>Yellow = known holder with no renewal period or status provided. Red = not in compliance but being worked toward. Green = compliant.</em></label>
 <label class="fld"><span>Notes</span><textarea name="notes" rows="3" maxlength="1000">${v.notes || ''}</textarea></label>
 <div class="form-a"><a class="btn ghost" href="${c && c.id ? '/licences/' + c.id : '/licences'}">Cancel</a><button class="btn primary">${c && c.id ? 'Save changes' : 'Add licence'}</button></div></form>`;
     render(req, res, { title: c && c.id ? 'Edit licence' : 'Add licence', active: '/licences', body });
   }
   function parseLicence(req) {
     const b = req.body; const e = [];
+    const color = ['auto', 'green', 'yellow', 'red'].includes(b.compliance_color) ? b.compliance_color : 'auto';
     const out = {
       user_id: isAdmin(req) ? Number(b.user_id) : req.user.id, cert_type_id: Number(b.cert_type_id),
       jurisdiction: String(b.jurisdiction || '').trim().slice(0, 60) || null, licence_number: String(b.licence_number || '').trim().slice(0, 60) || null,
       cycle_start: String(b.cycle_start || ''), expiry_date: String(b.expiry_date || ''),
-      hours_required: Number(b.hours_required), ethics_required: Number(b.ethics_required || 0), notes: String(b.notes || '').trim().slice(0, 1000) || null,
+      hours_required: Number(b.hours_required), ethics_required: Number(b.ethics_required || 0),
+      compliance_color: color, notes: String(b.notes || '').trim().slice(0, 1000) || null,
     };
     if (!db.prepare('SELECT 1 FROM users WHERE id=?').get(out.user_id)) e.push('Choose a person.');
     if (!db.prepare('SELECT 1 FROM cert_types WHERE id=?').get(out.cert_type_id)) e.push('Choose a credential.');
@@ -68,7 +80,7 @@ ${isAdmin(req) ? html`<label class="fld"><span>Person</span><select name="user_i
   app.post('/licences', (req, res) => {
     const { out, errors } = parseLicence(req);
     if (errors) return licenceForm(req, res, out, errors);
-    const id = db.prepare('INSERT INTO user_certs(user_id,cert_type_id,jurisdiction,licence_number,cycle_start,expiry_date,hours_required,ethics_required,notes) VALUES(@user_id,@cert_type_id,@jurisdiction,@licence_number,@cycle_start,@expiry_date,@hours_required,@ethics_required,@notes)').run(out).lastInsertRowid;
+    const id = db.prepare('INSERT INTO user_certs(user_id,cert_type_id,jurisdiction,licence_number,cycle_start,expiry_date,hours_required,ethics_required,compliance_color,notes) VALUES(@user_id,@cert_type_id,@jurisdiction,@licence_number,@cycle_start,@expiry_date,@hours_required,@ethics_required,@compliance_color,@notes)').run(out).lastInsertRowid;
     audit(req.user.id, 'licence.create', String(id), req.ip);
     flash(req, 'ok', 'Licence added.'); res.redirect('/licences/' + id);
   });
@@ -80,7 +92,7 @@ ${isAdmin(req) ? html`<label class="fld"><span>Person</span><select name="user_i
     const milestones = THRESHOLDS.slice().reverse().map(t => { const d = addDays(c.expiry_date, -t); const sent = rems.find(r => r.kind === 'd' + t && r.cycle_expiry === c.expiry_date); return { t, d, sent, past: d <= todayISO() }; });
     const body = html`
 <section class="grid g-2-1">
-<div class="card"><div class="lic-head"><div class="lic-h"><span class="code">${c.code}</span>${badge(c.status)}</div>
+<div class="card"><div class="lic-head"><div class="lic-h"><span class="code">${c.code}</span>${colorBadge(c)}${badge(c.status)}</div>
 <h2 class="xl">${c.type_name}</h2><p class="muted">${[c.jurisdiction, c.issuer, c.licence_number ? '#' + c.licence_number : null].filter(Boolean).join(' · ')}</p></div>
 <div class="meters"><div class="meter"><span class="kpi-l">Total CE hours</span><div class="m-v"><strong>${n(c.hours)}</strong><span>/ ${n(c.hours_required)}</span></div>${progress(c.hours, c.hours_required, c.complete ? 'current' : c.status)}<span class="kpi-s">${c.hoursShort ? `${n(c.hoursShort)} hours to go` : 'Requirement met ✓'}</span></div>
 <div class="meter"><span class="kpi-l">Ethics hours</span><div class="m-v"><strong>${n(c.ethics)}</strong><span>/ ${n(c.ethics_required)}</span></div>${progress(c.ethics, c.ethics_required || 1, c.ethicsShort ? c.status : 'current')}<span class="kpi-s">${c.ethics_required ? (c.ethicsShort ? `${n(c.ethicsShort)} ethics hours to go` : 'Requirement met ✓') : 'Not required'}</span></div>
@@ -102,7 +114,7 @@ ${rems.length ? html`<div class="card flush"><div class="card-h pad"><div><h2>Re
     const c = getCert(req, req.params.id); if (!c) return notFound(res);
     const { out, errors } = parseLicence(req);
     if (errors) return licenceForm(req, res, { ...out, id: c.id }, errors);
-    db.prepare('UPDATE user_certs SET user_id=@user_id,cert_type_id=@cert_type_id,jurisdiction=@jurisdiction,licence_number=@licence_number,cycle_start=@cycle_start,expiry_date=@expiry_date,hours_required=@hours_required,ethics_required=@ethics_required,notes=@notes WHERE id=@id').run({ ...out, id: c.id });
+    db.prepare('UPDATE user_certs SET user_id=@user_id,cert_type_id=@cert_type_id,jurisdiction=@jurisdiction,licence_number=@licence_number,cycle_start=@cycle_start,expiry_date=@expiry_date,hours_required=@hours_required,ethics_required=@ethics_required,compliance_color=@compliance_color,notes=@notes WHERE id=@id').run({ ...out, id: c.id });
     audit(req.user.id, 'licence.update', String(c.id), req.ip);
     flash(req, 'ok', 'Licence updated.'); res.redirect('/licences/' + c.id);
   });

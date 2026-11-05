@@ -13,6 +13,14 @@ function addDays(s, n) { return new Date(parseISO(s) + n * DAY).toISOString().sl
 function addMonths(s, n) { const [y, m, d] = s.split('-').map(Number); const dt = new Date(Date.UTC(y, m - 1 + n, d)); return dt.toISOString().slice(0, 10); }
 function isISODate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(parseISO(s)) && new Date(parseISO(s)).toISOString().slice(0, 10) === s; }
 
+function resolveColor(uc, hoursShort, ethicsShort, days) {
+  const forced = uc.compliance_color;
+  if (forced === 'green' || forced === 'yellow' || forced === 'red') return forced;
+  // auto: green when current cycle is met and not expired; otherwise red (working toward / behind)
+  if (days < 0 || hoursShort > 0 || ethicsShort > 0) return 'red';
+  return 'green';
+}
+
 function evaluate(uc, entries) {
   const inCycle = entries.filter(e => e.user_id === uc.user_id && e.completed_date >= uc.cycle_start && e.completed_date <= uc.expiry_date && (e.user_cert_id == null || e.user_cert_id === uc.id));
   const hours = round(inCycle.reduce((a, e) => a + e.hours, 0));
@@ -25,7 +33,8 @@ function evaluate(uc, entries) {
   if (days < 0) status = 'expired';
   else if (days <= 90 || (!complete && days <= 180)) status = 'due';
   const pct = uc.hours_required ? Math.min(100, Math.round((hours / uc.hours_required) * 100)) : 100;
-  return { ...uc, hours, ethics, hoursShort, ethicsShort, complete, days, status, pct, entryCount: inCycle.length };
+  const color = resolveColor(uc, hoursShort, ethicsShort, days);
+  return { ...uc, hours, ethics, hoursShort, ethicsShort, complete, days, status, color, pct, entryCount: inCycle.length };
 }
 function round(n) { return Math.round(n * 100) / 100; }
 
@@ -47,4 +56,15 @@ function loadCerts({ userId, id } = {}) {
 }
 
 const STATUS_LABEL = { current: 'Current', due: 'Due soon', expired: 'Expired' };
-module.exports = { todayISO, daysBetween, addDays, addMonths, isISODate, evaluate, loadCerts, STATUS_LABEL, parseISO };
+const COLOR_LABEL = {
+  green: 'Compliant',
+  yellow: 'Info needed',
+  red: 'Working toward',
+};
+const COLOR_HINT = {
+  green: 'In compliance',
+  yellow: 'Licence held — renewal period or status not yet provided',
+  red: 'Not in compliance — being worked toward',
+};
+
+module.exports = { todayISO, daysBetween, addDays, addMonths, isISODate, evaluate, loadCerts, STATUS_LABEL, COLOR_LABEL, COLOR_HINT, parseISO, resolveColor };

@@ -8,13 +8,13 @@ const helmet = require('helmet');
 const { rateLimit } = require('express-rate-limit');
 const multer = require('multer');
 const bcrypt = require('bcryptjs');
-const { db, UPLOADS, secret, audit } = require('./db');
-const { loadCerts, todayISO, isISODate, addMonths, addDays, STATUS_LABEL } = require('./domain');
+const { db, UPLOADS, secret, audit, getSetting, setSetting } = require('./db');
+const { loadCerts, todayISO, isISODate, addMonths, addDays, STATUS_LABEL, COLOR_LABEL, COLOR_HINT } = require('./domain');
 const { runReminders, sendManual, KIND_LABEL, THRESHOLDS } = require('./reminders');
 const { transportName } = require('./mailer');
 const { html, raw } = require('./html');
 const V = require('./views');
-const { icon, badge, avatar, progress, fmtDate, fmtDateTime, relDays, n } = V;
+const { icon, badge, colorBadge, avatar, progress, fmtDate, fmtDateTime, relDays, n } = V;
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -103,7 +103,7 @@ function loginPage(res, error, email = '') {
 <body class="login-body"><div class="login">
 <section class="login-art"><div class="art-grid"></div><div class="art-glow"></div>
 <div class="art-in"><div class="brand lg">${V.logo()}<div><strong>Credentia</strong><span>CE &amp; licence compliance</span></div></div>
-<div class="art-copy"><h2>Every licence current.<br><span>Every hour accounted for.</span></h2><p>Track CPA, EA, CFP, CMA and CISA requirements across your firm — with certificates on file and renewal reminders that send themselves.</p></div>
+<div class="art-copy"><h2>Every licence current.<br><span>Every hour accounted for.</span></h2><p>Track every licence and certification across your firm — CPE certificates on file, staff status confirmations, and renewal reminders that send themselves.</p></div>
 <div class="art-card"><div class="ac-row"><span class="badge b-current"><span class="dot"></span>Current</span><span class="ac-meta">CPA · California</span></div><div class="ac-h"><strong>74</strong><span>/ 80 hrs</span></div><progress class="pg pg-current" value="74" max="80"></progress><div class="ac-foot"><span>Ethics 4 / 4 ✓</span><span>Renews in 7 mo</span></div></div>
 </div></section>
 <section class="login-form"><div class="lf"><form method="post" action="/login" class="lf-in" autocomplete="on">
@@ -172,6 +172,7 @@ function hoursCell(c) {
 }
 function emptyState(title, text, cta) { return html`<div class="empty">${icon('file', 'i big')}<strong>${title}</strong><p>${text}</p>${cta || ''}</div>`; }
 function statusCounts(certs) { const s = { current: 0, due: 0, expired: 0 }; certs.forEach(c => s[c.status]++); return s; }
+function colorCounts(certs) { const s = { green: 0, yellow: 0, red: 0 }; certs.forEach(c => { if (s[c.color] != null) s[c.color]++; }); return s; }
 const pct = (a, b) => b ? Math.round((a / b) * 100) : 100;
 function ceTable(entries, showPerson) {
   if (!entries.length) return emptyState('No CE credits logged', 'Completed courses and their certificates will appear here.', html`<a class="btn primary" href="/ce/new">${icon('upload')} Log CE</a>`);
@@ -179,4 +180,4 @@ function ceTable(entries, showPerson) {
 ${entries.map(e => html`<tr class="rowlink" data-href="/ce/${e.id}">${showPerson ? html`<td><div class="who">${avatar(e.person, 'sm')}<span>${e.person}</span></div></td>` : ''}<td><a href="/ce/${e.id}"><strong>${e.title}</strong></a><span class="sub">${[e.provider, e.field].filter(Boolean).join(' · ')}</span></td><td class="nowrap">${fmtDate(e.completed_date)}</td><td class="num">${n(e.hours)}</td><td class="num">${e.ethics_hours ? n(e.ethics_hours) : '—'}</td><td>${e.files ? html`<span class="pill ok">${icon('file')} On file</span>` : html`<span class="pill">Missing</span>`}</td></tr>`)}
 </tbody></table></div>`;
 }
-module.exports = { app, db, fs, path, crypto, bcrypt, multer, UPLOADS, audit, loadCerts, todayISO, isISODate, addMonths, addDays, STATUS_LABEL, runReminders, sendManual, KIND_LABEL, THRESHOLDS, transportName, html, raw, V, icon, badge, avatar, progress, fmtDate, fmtDateTime, relDays, n, requireAdmin, isAdmin, canAccessUser, flash, render, csrfField, notFound, verifyCsrf, certLabel, kpi, hoursCell, emptyState, statusCounts, pct, ceTable };
+module.exports = { app, db, fs, path, crypto, bcrypt, multer, UPLOADS, audit, getSetting, setSetting, loadCerts, todayISO, isISODate, addMonths, addDays, STATUS_LABEL, COLOR_LABEL, COLOR_HINT, runReminders, sendManual, KIND_LABEL, THRESHOLDS, transportName, html, raw, V, icon, badge, colorBadge, avatar, progress, fmtDate, fmtDateTime, relDays, n, requireAdmin, isAdmin, canAccessUser, flash, render, csrfField, notFound, verifyCsrf, certLabel, kpi, hoursCell, emptyState, statusCounts, colorCounts, pct, ceTable };

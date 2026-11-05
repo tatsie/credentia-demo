@@ -47,10 +47,25 @@ CREATE TABLE IF NOT EXISTS audit(
   id INTEGER PRIMARY KEY, user_id INTEGER, action TEXT NOT NULL, detail TEXT, ip TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')));
 CREATE TABLE IF NOT EXISTS sessions(sid TEXT PRIMARY KEY, sess TEXT NOT NULL, expires INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS attestations(
+  id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  statement TEXT NOT NULL, confirmed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  ip TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));
 CREATE INDEX IF NOT EXISTS ix_uc_user ON user_certs(user_id);
 CREATE INDEX IF NOT EXISTS ix_ce_user ON ce_entries(user_id);
 CREATE INDEX IF NOT EXISTS ix_rem_uc ON reminders(user_cert_id, cycle_expiry, kind);
+CREATE INDEX IF NOT EXISTS ix_attest_user ON attestations(user_id, confirmed_at DESC);
 `);
+
+// Migrations for DBs created before compliance_color / settings / attestations existed.
+(function migrate() {
+  const cols = db.prepare('PRAGMA table_info(user_certs)').all().map(c => c.name);
+  if (!cols.includes('compliance_color')) {
+    db.exec("ALTER TABLE user_certs ADD COLUMN compliance_color TEXT NOT NULL DEFAULT 'auto'");
+  }
+  db.prepare("INSERT OR IGNORE INTO settings(key, value) VALUES('cpe_folder_path', ?)").run('Z:\\Shared\\Internal\\CPE');
+})();
 
 function secret() {
   if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
@@ -63,4 +78,12 @@ function audit(userId, action, detail, ip) {
   db.prepare('INSERT INTO audit(user_id,action,detail,ip) VALUES(?,?,?,?)').run(userId || null, action, detail || null, ip || null);
 }
 
-module.exports = { db, STORAGE, UPLOADS, secret, audit };
+function getSetting(key, fallback = '') {
+  const r = db.prepare('SELECT value FROM settings WHERE key=?').get(key);
+  return r ? r.value : fallback;
+}
+function setSetting(key, value) {
+  db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, value);
+}
+
+module.exports = { db, STORAGE, UPLOADS, secret, audit, getSetting, setSetting };

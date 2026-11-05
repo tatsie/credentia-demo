@@ -9,8 +9,12 @@ login(){ local jar=$1 email=$2; rm -f $jar; curl -s -c $jar -b $jar "$B/login" -
 code(){ curl -s -b $1 -o /tmp/o.html -w "%{http_code}" "$B$2"; }
 echo "admin login: $(login /tmp/a.jar morgan.ellis@harborpine.example)"
 echo "staff login: $(login /tmp/s.jar daniel.okafor@harborpine.example)"
-for p in / /licences /ce /people /catalog /reminders /outbox /account /licences/new /ce/new /reports/compliance.csv "/licences?status=due" /people/3; do echo "admin $p -> $(code /tmp/a.jar "$p")"; done
-for p in / /licences /ce /account /people /catalog /reminders /outbox /reports/compliance.csv; do echo "staff $p -> $(code /tmp/s.jar "$p")"; done
+for p in / /licences /ce /people /catalog /reminders /outbox /account /settings /licences/new /ce/new /reports/compliance.csv "/licences?color=yellow" "/licences?status=due" /people/3; do echo "admin $p -> $(code /tmp/a.jar "$p")"; done
+echo "admin cpe zip -> $(curl -s -b /tmp/a.jar -o /tmp/cpe.zip -w "%{http_code} size=%{size_download}" "$B/reports/cpe-folder.zip"); file /tmp/cpe.zip | head -1"
+for p in / /licences /ce /account /people /catalog /reminders /outbox /settings /reports/compliance.csv /reports/cpe-folder.zip; do echo "staff $p -> $(code /tmp/s.jar "$p")"; done
+# staff attestation
+curl -s -b /tmp/s.jar "$B/" -o /tmp/d.html; T=$(tok /tmp/d.html)
+echo "staff attest -> $(curl -s -b /tmp/s.jar -o /dev/null -w "%{http_code} %{redirect_url}" --data-urlencode "_csrf=$T" --data-urlencode "statement=I confirm that I have submitted my CPE completion certificates and that the licences and certifications listed for me in Credentia accurately reflect my current status." "$B/attest")"
 # staff trying to view someone else's licence / CE / file
 OTHER_LIC=$(sqlite3 storage/app.db "select id from user_certs where user_id<>(select id from users where email='daniel.okafor@harborpine.example') limit 1" 2>/dev/null || true)
 echo "staff other licence -> $(code /tmp/s.jar /licences/1)"

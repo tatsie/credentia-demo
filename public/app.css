@@ -103,10 +103,19 @@ form.inline{display:inline}
 /* badges & pills */
 .badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px 0 8px;border-radius:99px;font-size:12px;font-weight:500;white-space:nowrap;border:1px solid transparent}
 .badge .dot,.dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
-.b-current{color:var(--ok);background:var(--ok-soft)}
-.b-due{color:var(--warn);background:var(--warn-soft)}
-.b-expired{color:var(--bad);background:var(--bad-soft)}
+.b-current,.b-green{color:var(--ok);background:var(--ok-soft)}
+.b-due,.b-yellow{color:var(--warn);background:var(--warn-soft)}
+.b-expired,.b-red{color:var(--bad);background:var(--bad-soft)}
 .d-current{background:var(--ok)}.d-due{background:var(--warn)}.d-expired{background:var(--bad)}
+.t-ok{color:var(--ok)!important}
+.seg-gap{width:10px;flex:none}
+.attest{padding:0;overflow:hidden}
+.attest-ok,.attest-need{display:flex;align-items:flex-start;gap:14px;padding:18px 20px}
+.attest-ok .i,.attest-need .i{width:22px;height:22px;color:var(--accent);margin-top:2px}
+.attest-ok{background:var(--ok-soft)}
+.attest-need{background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 8%,var(--surface)),var(--surface))}
+.attest-need .chk{margin-top:10px;display:block;font-size:13px;color:var(--text2);line-height:1.45}
+.attest form{margin-left:auto;flex:none;align-self:center}
 .pill{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:500;background:var(--surface2);color:var(--muted);border:1px solid var(--border);white-space:nowrap;text-transform:capitalize}
 .pill .i{width:13px;height:13px}
 .pill.ok{color:var(--ok);background:var(--ok-soft);border-color:transparent}
